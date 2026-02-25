@@ -701,10 +701,14 @@ vk::PipelineVertexInputStateCreateInfo PipelineCache::get_vertex_input_state(con
 
         const bool is_instanced = gxm::is_stream_instancing(static_cast<SceGxmIndexSource>(stream.indexSource));
 
+        uint32_t stride = stream.stride;
 #ifdef __APPLE__
-        const uint32_t stride = align(stream.stride, 4);
-#else
-        const uint32_t stride = stream.stride;
+        stride = align(stride, 4);
+#elif defined(__ANDROID__)
+        // Adreno GPU also requires stride to be multiples of 4 for optimal performance
+        if (context.state.is_adreno_stock) {
+            stride = align(stride, 4);
+        }
 #endif
         binding_descr.push_back(vk::VertexInputBindingDescription{
             .binding = stream_index,

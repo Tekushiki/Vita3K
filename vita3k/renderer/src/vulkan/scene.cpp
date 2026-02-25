@@ -299,21 +299,26 @@ static void bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
             } else {
                 const uint8_t *stream = state.vertex_streams[i].data.get(mem);
                 uint32_t stream_size = state.vertex_streams[i].size;
+
+                bool restride = false;
 #ifdef __APPLE__
                 // Vulkan allows any stride, but Metal only allows multiples of 4.
-                const bool restride = vertex_program.streams[i].stride % 4 != 0;
+                restride = vertex_program.streams[i].stride % 4 != 0;
+#elif defined(__ANDROID__)
+                // Adreno GPU also requires stride to be multiples of 4 for optimal performance
+                restride = context.state.is_adreno_stock && (vertex_program.streams[i].stride % 4 != 0);
+#endif
+
                 if (restride) {
                     restride_stream(stream, stream_size, vertex_program.streams[i].stride);
                 }
-#endif
+
                 context.vertex_stream_ring_buffer.allocate(context.prerender_cmd, stream_size, stream);
                 context.vertex_stream_offsets[i] = context.vertex_stream_ring_buffer.data_offset;
 
-#ifdef __APPLE__
                 if (restride) {
                     delete[] stream;
                 }
-#endif
             }
 
             state.vertex_streams[i].data = nullptr;
