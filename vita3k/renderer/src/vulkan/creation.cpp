@@ -132,12 +132,12 @@ VKContext::VKContext(VKState &state, MemState &mem)
                 .range = frag_uniform_size },
             vk::DescriptorBufferInfo{
                 .buffer = vertex_uniform_stream_ring_buffer.handle(),
-                // TODO: get max range of buffer
-                .range = KB(500) },
+                // Large enough dynamic range for shaders with bigger uniform storage layouts.
+                .range = MiB(4) },
             vk::DescriptorBufferInfo{
                 .buffer = fragment_uniform_stream_ring_buffer.handle(),
-                // TODO: get max range of buffer
-                .range = KB(500) },
+                // Must match the storage ring buffer tail room (see vkutil::RingBuffer).
+                .range = MiB(4) },
         };
 
         std::array<vk::WriteDescriptorSet, 4> write_descr;
