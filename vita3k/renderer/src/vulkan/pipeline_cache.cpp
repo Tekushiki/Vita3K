@@ -706,7 +706,7 @@ vk::PipelineVertexInputStateCreateInfo PipelineCache::get_vertex_input_state(con
         stride = align(stride, 4);
 #elif defined(__ANDROID__)
         // Adreno GPU also requires stride to be multiples of 4 for optimal performance
-        if (context.state.is_adreno_stock) {
+        if (this->state.is_adreno_stock) {
             stride = align(stride, 4);
         }
 #endif
