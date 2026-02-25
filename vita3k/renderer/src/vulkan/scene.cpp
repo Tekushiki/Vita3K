@@ -100,9 +100,9 @@ void mid_scene_flush(VKContext &context, const SceGxmNotification notification) 
     }
 }
 
-#ifdef __APPLE__
 // restride vertex attribute binding strides to multiple of 4
 // needed for metal because it only allows multiples of 4.
+// also needed for Adreno GPU on Android
 void restride_stream(const uint8_t *&stream, uint32_t &size, uint32_t stride) {
     const uint32_t new_stride = align(stride, 4);
     const uint32_t nb_vertex_input = ((size + stride - 1) / stride);
@@ -115,7 +115,6 @@ void restride_stream(const uint8_t *&stream, uint32_t &size, uint32_t stride) {
     stream = new_data;
     size = nb_vertex_input * new_stride;
 }
-#endif
 
 // when needed, how many descriptor of the given size we allocate for each frame at once
 static constexpr uint32_t DESCRIPTOR_PACK_SIZE = 64;
