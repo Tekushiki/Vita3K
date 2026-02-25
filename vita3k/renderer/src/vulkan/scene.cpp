@@ -290,7 +290,19 @@ static void bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
 
     for (int i = 0; i < max_stream_idx; i++) {
         if (state.vertex_streams[i].data) {
-            if (context.state.features.enable_memory_mapping) {
+            bool restride = false;
+#ifdef __APPLE__
+            // Vulkan allows any stride, but Metal only allows multiples of 4.
+            restride = vertex_program.streams[i].stride % 4 != 0;
+#elif defined(__ANDROID__)
+            // Adreno GPU also requires stride to be multiples of 4 for optimal performance.
+            restride = context.state.is_adreno_stock && (vertex_program.streams[i].stride % 4 != 0);
+#endif
+
+            // If stream restriding is required, we must upload/copy the restrided data,
+            // even when memory mapping is enabled, otherwise binding stride no longer
+            // matches the actual data layout in game memory.
+            if (context.state.features.enable_memory_mapping && !restride) {
                 auto [buffer, offset] = context.state.get_matching_mapping(state.vertex_streams[i].data.cast<void>());
 
                 context.vertex_stream_offsets[i] = offset;
@@ -299,21 +311,13 @@ static void bind_vertex_streams(VKContext &context, MemState &mem, uint32_t inst
                 const uint8_t *stream = state.vertex_streams[i].data.get(mem);
                 uint32_t stream_size = state.vertex_streams[i].size;
 
-                bool restride = false;
-#ifdef __APPLE__
-                // Vulkan allows any stride, but Metal only allows multiples of 4.
-                restride = vertex_program.streams[i].stride % 4 != 0;
-#elif defined(__ANDROID__)
-                // Adreno GPU also requires stride to be multiples of 4 for optimal performance
-                restride = context.state.is_adreno_stock && (vertex_program.streams[i].stride % 4 != 0);
-#endif
-
                 if (restride) {
                     restride_stream(stream, stream_size, vertex_program.streams[i].stride);
                 }
 
                 context.vertex_stream_ring_buffer.allocate(context.prerender_cmd, stream_size, stream);
                 context.vertex_stream_offsets[i] = context.vertex_stream_ring_buffer.data_offset;
+                context.vertex_stream_buffers[i] = context.vertex_stream_ring_buffer.handle();
 
                 if (restride) {
                     delete[] stream;

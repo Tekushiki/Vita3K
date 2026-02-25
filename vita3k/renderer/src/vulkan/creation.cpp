@@ -17,6 +17,8 @@
 
 #include <xxh3.h>
 
+#include <algorithm>
+
 #include <renderer/types.h>
 #include <renderer/vulkan/functions.h>
 #include <renderer/vulkan/gxm_to_vulkan.h>
@@ -48,7 +50,11 @@ VKContext::VKContext(VKState &state, MemState &mem)
 
     const uint32_t uniform_alignment = static_cast<uint32_t>(state.physical_device_properties.limits.minUniformBufferOffsetAlignment);
     const uint32_t storage_alignment = static_cast<uint32_t>(state.physical_device_properties.limits.minStorageBufferOffsetAlignment);
-    vertex_uniform_stream_ring_buffer.alignment = storage_alignment;
+    // Dynamic SSBO offsets must satisfy the Vulkan device requirement. Vertex
+    // uniform data is consumed through vec4/std430 reads, so keep a vec4-aligned
+    // base offset even on devices reporting a smaller storage alignment.
+    constexpr uint32_t vec4_alignment = 4U * sizeof(float);
+    vertex_uniform_stream_ring_buffer.alignment = std::max(storage_alignment, vec4_alignment);
     fragment_uniform_stream_ring_buffer.alignment = storage_alignment;
     vertex_info_uniform_buffer.alignment = uniform_alignment;
     fragment_info_uniform_buffer.alignment = uniform_alignment;
@@ -126,12 +132,12 @@ VKContext::VKContext(VKState &state, MemState &mem)
                 .range = frag_uniform_size },
             vk::DescriptorBufferInfo{
                 .buffer = vertex_uniform_stream_ring_buffer.handle(),
-                // TODO: get max range of buffer
-                .range = KB(500) },
+                // Large enough dynamic range for shaders with bigger uniform storage layouts.
+                .range = MiB(4) },
             vk::DescriptorBufferInfo{
                 .buffer = fragment_uniform_stream_ring_buffer.handle(),
-                // TODO: get max range of buffer
-                .range = KB(500) },
+                // Must match the storage ring buffer tail room (see vkutil::RingBuffer).
+                .range = MiB(4) },
         };
 
         std::array<vk::WriteDescriptorSet, 4> write_descr;

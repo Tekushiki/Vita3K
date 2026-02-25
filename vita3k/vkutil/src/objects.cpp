@@ -176,8 +176,8 @@ RingBuffer::RingBuffer(vk::BufferUsageFlags usage, const size_t capacity)
     , capacity(capacity) {
     uint32_t buffer_capacity = capacity;
     if (usage & vk::BufferUsageFlagBits::eStorageBuffer)
-        // TODO: put max size of a gxm uniform buffer
-        buffer_capacity += 500 * 1024;
+        // keep enough tail room for the dynamic SSBO descriptor range
+        buffer_capacity += 4 * 1024 * 1024;
     if (usage & vk::BufferUsageFlagBits::eVertexBuffer)
         // for AMD GPUs, in case the buffer ends exactly with an rgb16 component (which is read as rgba)
         buffer_capacity += 2;
