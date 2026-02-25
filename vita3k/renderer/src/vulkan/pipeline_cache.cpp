@@ -702,14 +702,21 @@ vk::PipelineVertexInputStateCreateInfo PipelineCache::get_vertex_input_state(con
         const bool is_instanced = gxm::is_stream_instancing(static_cast<SceGxmIndexSource>(stream.indexSource));
 
         uint32_t stride = stream.stride;
+        // Keep binding stride consistent with the actual backing data layout.
+        // When memory mapping is disabled we may restride uploaded streams in scene.cpp,
+        // so apply the same alignment here. With memory mapping enabled we bind game
+        // memory directly and must preserve the original stride.
+        if (!state.features.enable_memory_mapping) {
 #ifdef __APPLE__
-        stride = align(stride, 4);
-#elif defined(__ANDROID__)
-        // Adreno GPU also requires stride to be multiples of 4 for optimal performance
-        if (this->state.is_adreno_stock) {
             stride = align(stride, 4);
-        }
+#elif defined(__ANDROID__)
+            // Adreno GPUs can require 4-byte strides, but only when we also restride
+            // the uploaded stream data.
+            if (state.is_adreno_stock) {
+                stride = align(stride, 4);
+            }
 #endif
+        }
         binding_descr.push_back(vk::VertexInputBindingDescription{
             .binding = stream_index,
             .stride = stride,
